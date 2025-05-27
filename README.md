@@ -1,51 +1,124 @@
 <!---
 {
-  "depends_on": [],
+  "id": "186f282c-fe31-4ce9-85eb-6cf61007b610",
+  "depends_on": ["d1bee1c7-d88a-4f00-a44e-3e402f6ee826"],
   "author": "Stephan Bökelmann",
-  "first_used": "2025-03-17",
-  "keywords": ["learning", "exercises", "education", "practice"]
+  "first_used": "2025-05-27",
+  "keywords": ["InfluxDB", "Docker", "Container", "Persistent Storage", "Time Series", "Flux"]
 }
 --->
 
-# Learning Through Exercises
+# Using InfluxDB v2 in a Docker Container
 
-## Introduction
-Learning by doing is one of the most effective methods to acquire new knowledge and skills. Rather than passively consuming information, actively engaging in problem-solving fosters deeper understanding and long-term retention. By working through structured exercises, students can grasp complex concepts in a more intuitive and applicable way. This approach is particularly beneficial in technical fields like programming, mathematics, and engineering.
+> In this exercise you will learn how to deploy and interact with an InfluxDB v2 database using Docker containers. Furthermore, we will explore how data persistence affects containerized databases and how to prevent data loss using volume mounts.
+
+### Introduction
+
+InfluxDB is a high-performance time series database designed for storing and querying large volumes of timestamped data, such as metrics and events. With the release of InfluxDB v2, significant changes have been introduced, including a unified API, a new query language called Flux, and an integrated UI for data exploration.
+
+Deploying InfluxDB within Docker containers offers a streamlined approach to setting up and managing the database environment. However, it's crucial to understand how data persistence works in this context. By default, Docker containers are ephemeral, meaning that any data stored inside the container is lost when the container is removed. To ensure data durability, especially for databases, it's essential to configure persistent storage using Docker volumes.
+
+In this exercise, we will guide you through the process of running InfluxDB v2 in a Docker container, initially without persistent storage to observe the effects, and then with a Docker volume to maintain data across container restarts and removals. You'll learn how to interact with InfluxDB using its CLI and UI, create buckets (analogous to databases), write and query data using Flux, and understand the importance of data persistence in containerized environments.
 
 ### Further Readings and Other Sources
-- [The Importance of Practice in Learning](https://www.sciencedirect.com/science/article/pii/S036013151300062X)
-- "The Art of Learning" by Josh Waitzkin
-- [How to Learn Effectively: 5 Key Strategies](https://www.edutopia.org/article/5-research-backed-learning-strategies)
 
-## Tasks
-1. **Write a Summary**: Summarize the concept of "learning by doing" in 3-5 sentences.
-2. **Example Identification**: List three examples from your own experience where learning through exercises helped you understand a topic better.
-3. **Create an Exercise**: Design a simple exercise for a topic of your choice that someone else could use to practice.
-4. **Follow an Exercise**: Find an online tutorial that includes exercises and complete at least two of them.
-5. **Modify an Existing Exercise**: Take a basic problem from a textbook or online course and modify it to make it slightly more challenging.
-6. **Pair Learning**: Explain a concept to a partner and guide them through an exercise without giving direct answers.
-7. **Review Mistakes**: Look at an exercise you've previously completed incorrectly. Identify why the mistake happened and how to prevent it in the future.
-8. **Time Challenge**: Set a timer for 10 minutes and try to solve as many simple exercises as possible on a given topic.
-9. **Self-Assessment**: Create a checklist to evaluate your own performance in completing exercises effectively.
-10. **Reflect on Progress**: Write a short paragraph on how this structured approach to exercises has influenced your learning.
+* [InfluxDB Docker Hub Repository](https://hub.docker.com/_/influxdb)
+* [InfluxDB v2 Documentation](https://docs.influxdata.com/influxdb/v2/)
+* [Docker Volumes Documentation](https://docs.docker.com/storage/volumes/)
+* [Flux Language Reference](https://docs.influxdata.com/flux/v0.x/)
+* [InfluxDB v2 Tutorial](https://www.youtube.com/watch?v=BcckJKke_dE)
 
-<details>
-  <summary>Tip for Task 5</summary>
-  Try making small adjustments first, such as increasing the difficulty slightly or adding an extra constraint.
-</details>
+### Tasks
 
-## Questions
-1. What are the main benefits of learning through exercises compared to passive learning?
-2. How do exercises improve long-term retention?
-3. Can you think of a subject where learning through exercises might be less effective? Why?
-4. What role does feedback play in learning through exercises?
-5. How can self-designed exercises improve understanding?
-6. Why is it beneficial to review past mistakes in exercises?
-7. How does explaining a concept to someone else reinforce your own understanding?
-8. What strategies can you use to stay motivated when practicing with exercises?
-9. How can timed challenges contribute to learning efficiency?
-10. How do exercises help bridge the gap between theory and practical application?
+1. **Pull the InfluxDB v2 Image:**
 
-## Advice
-Practice consistently and seek out diverse exercises that challenge different aspects of a topic. Combine exercises with reflection and feedback to maximize your learning efficiency. Don't hesitate to adapt exercises to fit your own needs and ensure that you're actively engaging with the material, rather than just going through the motions.
+   ```bash
+   docker pull influxdb:2
+   docker images | grep influxdb
+   ```
 
+2. **Run an InfluxDB Container:**
+
+   ```bash
+   docker run --name influxdb-temp -p 8086:8086 -d influxdb:2
+   docker ps -a
+   ```
+
+3. **Access the InfluxDB UI and Perform Initial Setup:**
+   Visit `http://localhost:8086` and set up with:
+
+   * Username: `admin`
+   * Password: `admin123`
+   * Organization: `example-org`
+   * Bucket: `example-bucket`
+
+4. **Write Data to the Bucket:**
+
+   ```bash
+   docker exec -it influxdb-temp influx write \
+     --bucket example-bucket \
+     --org example-org \
+     --precision s \
+     --token <your-token> \
+     --body 'temperature,location=office value=23.5 1625865600'
+   ```
+
+5. **Query the Data Using Flux:**
+
+   ```flux
+   from(bucket: "example-bucket")
+     |> range(start: -1h)
+     |> filter(fn: (r) => r._measurement == "temperature")
+   ```
+
+6. **Stop and Remove the Container:**
+
+   ```bash
+   docker stop influxdb-temp
+   docker rm influxdb-temp
+   ```
+
+7. **Run a New Container Without Persistent Storage:**
+
+   ```bash
+   docker run --name influxdb-temp -p 8086:8086 -d influxdb:2
+   ```
+
+8. **Create a Docker Volume for Persistence:**
+
+   ```bash
+   docker volume create influxdb2-data
+   docker run --name influxdb-persistent -p 8086:8086 \
+     -v influxdb2-data:/var/lib/influxdb2 \
+     -v influxdb2-config:/etc/influxdb2 \
+     -e DOCKER_INFLUXDB_INIT_MODE=setup \
+     -e DOCKER_INFLUXDB_INIT_USERNAME=admin \
+     -e DOCKER_INFLUXDB_INIT_PASSWORD=admin123 \
+     -e DOCKER_INFLUXDB_INIT_ORG=example-org \
+     -e DOCKER_INFLUXDB_INIT_BUCKET=example-bucket \
+     -d influxdb:2
+   ```
+
+9. **Verify Data Persistence:**
+
+   ```bash
+   docker stop influxdb-persistent
+   docker rm influxdb-persistent
+
+   docker run --name influxdb-persistent -p 8086:8086 \
+     -v influxdb2-data:/var/lib/influxdb2 \
+     -v influxdb2-config:/etc/influxdb2 \
+     -d influxdb:2
+   ```
+
+### Questions
+
+1. What happens to the InfluxDB data when the container is deleted without persistent storage?
+2. Why is using a volume critical for database containers?
+3. How do you list all Docker volumes on your system?
+4. Can you explain the command `-v influxdb2-data:/var/lib/influxdb2` in detail?
+5. What alternative methods besides named volumes could you use to persist data in Docker?
+
+### Advice
+
+Understanding how to manage data persistence in containerized environments is crucial for maintaining reliable and consistent applications. InfluxDB v2, with its time series capabilities, is a powerful tool for monitoring and analytics. However, without proper volume configuration, all your data can be lost upon container removal. By practicing the setup with and without persistent storage, you gain insight into Docker's behavior and the importance of volumes. This knowledge is not only applicable to InfluxDB but extends to other stateful services you may deploy in the future. Remember to explore additional features of InfluxDB v2, such as its integrated UI, Flux language, and API capabilities, to fully leverage its potential in your projects.
